@@ -3,8 +3,9 @@ This program is running on an AWS lambda instance that runs the first of every m
 
 # How it works
 1. Refresh spotify API credentials
-2. Request the top 100 posts from r/listentothis
-3. Create a playlist for the spotify account and add the first 50 songs it can find on Spotify.
+2. Create a new historical playlist and copy the latest top 50
+3. Clear the latest top 50 playlist
+4. Request the top 100 posts from r/listentothis and add them to Latest top 50
 
 # Customizing
 In order to customize this for other subreddits, here are the steps.
