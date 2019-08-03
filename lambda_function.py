@@ -4,6 +4,34 @@ import praw
 import requests
 import base64
 import datetime
+import re
+
+def isDuplicate(userid, authorization, headers):
+    months = {
+        1: 'January',
+        2: 'February',
+        3: 'March',
+        4: 'April',
+        5: 'May',
+        6: 'June',
+        7: 'July',
+        8: 'August',
+        9: 'September',
+        10: 'October',
+        11: 'November',
+        12: 'December',
+    }
+
+    date = str(datetime.datetime.now()).split('-')
+    m = months[(int(date[1])-1)%12]
+    playlist_name = m + ' ' + date[0]
+    url = "https://api.spotify.com/v1/users/"+userid+"/playlists/"
+    response = requests.request('GET', url, headers = headers, allow_redirects=False, timeout=None)
+    playlists = response.json()
+    for item in playlists['items']:
+        if item['name'] == playlist_name:
+            return True
+    return False
 
 def makePlaylist(userid, authorization, headers):
     months = {
@@ -21,7 +49,7 @@ def makePlaylist(userid, authorization, headers):
         12: 'December',
     }
     date = str(datetime.datetime.now()).split('-')
-    m = months[(int(date[1])-2)%12]
+    m = months[(int(date[1])-1)%12]
     playlist_name = m + ' ' + date[0]
     url = "https://api.spotify.com/v1/users/"+userid+"/playlists/"
     payload = '{"name": '+'"'+playlist_name+'"'+'}'
@@ -108,6 +136,9 @@ def lambda_handler(event, context):
 
     #actual work
     
+    if isDuplicate(user_id, authorization, headers):
+        return
+    
     #Create the new historical playlist
     playlist_id = makePlaylist(user_id, authorization, headers)
     
@@ -119,17 +150,18 @@ def lambda_handler(event, context):
     
     #refill top 50
     song_uris = []
-    for submission in reddit.subreddit('listentothis').top(time_filter='month', limit=100):
+    for submission in reddit.subreddit('listentothis').top(time_filter='month', limit=150):
         if len(song_uris) == 50:
             break
         t = submission.title
         t = t.split(' [')[0]
-        t = t.split('(')[0]
-        t = t.replace('- ', '')
-        search_term = t.replace('-', '')
+        t = re.sub("\([^\)]+\)", "", t)
+        t = re.sub("(\u2013|\u2014|-|\")", ' ', t)
+        search_term = t
+        print(t)
         try:
             song_uris.append(getSongUri(search_term, authorization, headers))
         except IndexError:
             pass
+        
     addSongs(top_50_id, song_uris, authorization, headers)
-    
