@@ -19,12 +19,15 @@ def isDuplicate(userid, authorization, headers):
         9: 'September',
         10: 'October',
         11: 'November',
-        12: 'December',
+        0: 'December',
     }
 
     date = str(datetime.datetime.now()).split('-')
     m = months[(int(date[1])-1)%12]
-    playlist_name = m + ' ' + date[0]
+    yr = date[0]
+    if m == 'January':
+        yr = str(int(date[0])-1)
+    playlist_name = m + ' ' + yr
     url = "https://api.spotify.com/v1/users/"+userid+"/playlists/"
     response = requests.request('GET', url, headers = headers, allow_redirects=False, timeout=None)
     playlists = response.json()
@@ -46,11 +49,14 @@ def makePlaylist(userid, authorization, headers):
         9: 'September',
         10: 'October',
         11: 'November',
-        12: 'December',
+        0: 'December',
     }
     date = str(datetime.datetime.now()).split('-')
     m = months[(int(date[1])-1)%12]
-    playlist_name = m + ' ' + date[0]
+    yr = date[0]
+    if m == 'January':
+        yr = str(int(date[0])-1)
+    playlist_name = m + ' ' + yr
     url = "https://api.spotify.com/v1/users/"+userid+"/playlists/"
     payload = '{"name": '+'"'+playlist_name+'"'+'}'
     response = requests.request('POST', url, headers = headers, data = payload, allow_redirects=False, timeout=None)
@@ -61,8 +67,11 @@ def getSongUri(keywords, authorization, headers):
     url = "https://api.spotify.com/v1/search?q="+keywords+"&type=track&limit=1"
     response = requests.request('GET', url, headers = headers, allow_redirects=False, timeout=None)
     track = response.json()
-    uri = track['tracks']['items'][0]['uri']
-    return uri
+    try:
+        uri = track['tracks']['items'][0]['uri']
+        return uri
+    except KeyError:
+        pass
 
 def addSongs(playlist_id, uri_list, authorization, headers):
     uristring = ','.join(uri_list)
@@ -143,7 +152,7 @@ def lambda_handler(event, context):
     playlist_id = makePlaylist(user_id, authorization, headers)
     
     #copy songs from latest to historical
-    copySongs(top_50_id, playlist_id, authorization, headers)
+    # copySongs(top_50_id, playlist_id, authorization, headers)
     
     #clear top 50
     clearLatest(top_50_id, authorization, headers)
@@ -158,10 +167,14 @@ def lambda_handler(event, context):
         t = re.sub("\([^\)]+\)", "", t)
         t = re.sub("(\u2013|\u2014|-|\")", ' ', t)
         search_term = t
-        print(t)
         try:
-            song_uris.append(getSongUri(search_term, authorization, headers))
+            songUri = getSongUri(search_term, authorization, headers)
+            if songUri:
+                song_uris.append(songUri)
         except IndexError:
             pass
         
     addSongs(top_50_id, song_uris, authorization, headers)
+    addSongs(playlist_id, song_uris, authorization, headers)
+    
+    
